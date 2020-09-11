@@ -1,11 +1,13 @@
 use bevy::prelude::*;
 
+mod cursor;
 mod window;
 
 fn main() {
     App::build()
         .add_plugin(window::WindowPlugin)
         .add_default_plugins()
+        .add_plugin(cursor::CursorPlugin)
         .add_system(quit_system.system())
         .run();
 }
