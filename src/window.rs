@@ -16,6 +16,7 @@ impl Plugin for WindowPlugin {
         .add_system(lock_cursor_command_handler_system.system());
     }
 }
+
 pub struct LockCursor(pub bevy::window::WindowId);
 
 #[derive(Default)]
