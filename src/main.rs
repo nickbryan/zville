@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+mod camera;
 mod cursor;
 mod voxel;
 mod window;
@@ -11,6 +12,7 @@ fn main() {
         .add_system(bevy::input::system::exit_on_esc_system.system())
         .add_plugin(cursor::CursorPlugin)
         .add_plugin(voxel::VoxelPlugin)
+        .add_plugin(camera::CameraPlugin)
         .add_startup_system(setup.system())
         .run();
 }
@@ -45,12 +47,12 @@ fn setup(
         ..Default::default()
     });
 
-    commands.spawn(Camera3dComponents {
-        transform: Transform::new_sync_disabled(Mat4::face_toward(
-            Vec3::new(75.0, 50.0, 75.0),
-            Vec3::new(25.0, 5.0, 25.0),
-            Vec3::new(0.0, 1.0, 0.0),
-        )),
-        ..Default::default()
-    });
+    // commands.spawn(Camera3dComponents {
+    //     transform: Transform::new_sync_disabled(Mat4::face_toward(
+    //         Vec3::new(75.0, 50.0, 75.0),
+    //         Vec3::new(25.0, 5.0, 25.0),
+    //         Vec3::new(0.0, 1.0, 0.0),
+    //     )),
+    //     ..Default::default()
+    // });
 }
