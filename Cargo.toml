@@ -6,4 +6,6 @@ authors = ["Nick Bryan <nickbryan.dev@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0.32"
 bevy = { git = "https://github.com/bevyengine/bevy" }
+byteorder = "1"

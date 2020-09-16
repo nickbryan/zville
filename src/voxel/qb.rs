@@ -1,117 +1,93 @@
-use bevy::{math, render::color};
+use crate::voxel::matrix::{Matrix, Voxel};
+use bevy::{asset, math, render::color};
 use byteorder::{ByteOrder, LittleEndian};
 use std::io::{self, Read};
 use std::mem;
+use std::path::Path;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Size {
-    pub x: usize,
-    pub y: usize,
-    pub z: usize,
-}
+#[derive(Default)]
+pub struct QubicleBinaryLoader;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum ZAxisOrientation {
-    LeftHanded,
-    RightHanded,
-}
+impl asset::AssetLoader<Matrix> for QubicleBinaryLoader {
+    fn from_bytes(&self, _: &Path, bytes: Vec<u8>) -> anyhow::Result<Matrix> {
+        // Due to the way the .qb files are encoded we have to read the data even if we don't use it.
+        // Where data is read and not used the variable is prefixed with an _.
+        let mut bytes = bytes.as_slice();
 
-fn z_axis_orientation_from_data(data: u32) -> ZAxisOrientation {
-    if data > 0 {
-        return ZAxisOrientation::RightHanded;
-    }
+        let _version = read_u32(&mut bytes);
+        let _color_format = read_u32(&mut bytes);
+        let _z_axis_orientation = read_u32(&mut bytes);
 
-    ZAxisOrientation::LeftHanded
-}
+        let compressed = read_u32(&mut bytes) != 0;
+        if compressed {
+            // TODO: get rid of panic
+            panic!("we do not support compressed files");
+        }
 
-#[derive(Debug, Copy, Clone)]
-pub struct Header {
-    pub version: u32,
-    pub color_format: u32,
-    pub z_axis_orientation: ZAxisOrientation,
-    pub compressed: bool,
-    pub visibility_mask_encoded: bool,
-    pub num_matrices: u32,
-}
+        let _visibility_mask_encoded = read_u32(&mut bytes) != 0;
 
-#[derive(Debug, Copy, Clone)]
-pub struct VoxelData {
-    pub position: math::Vec3,
-    pub color: color::Color,
-    pub visible: bool,
-    // TODO: what about face visibility?
-}
+        let num_matrices = read_u32(&mut bytes);
+        if num_matrices != 1 {
+            // TODO: get rid of panic
+            panic!("expected only 1 matrix in file");
+        }
 
-#[derive(Debug)]
-pub struct Matrix {
-    pub name: String,
-    pub size: Size,
-    pub position: math::Vec3,
-    pub voxels: Vec<VoxelData>,
-}
+        let name_len = read_byte(&mut bytes);
+        let _name = String::from_utf8(read(&mut bytes, name_len as usize)).unwrap();
 
-#[derive(Debug)]
-pub struct QubicleData {
-    pub header: Header,
-    pub matrices: Vec<Matrix>,
-}
+        let size_x = read_u32(&mut bytes) as usize;
+        let size_y = read_u32(&mut bytes) as usize;
+        let size_z = read_u32(&mut bytes) as usize;
 
-pub fn parse<T: io::Read>(data: T) -> QubicleData {
-    let mut buf_reader = io::BufReader::new(data);
+        let _matrix_position = math::Vec3::new(
+            read_u32(&mut bytes) as f32,
+            read_u32(&mut bytes) as f32,
+            read_u32(&mut bytes) as f32,
+        );
 
-    let mut qb = QubicleData {
-        header: Header {
-            version: read_u32(&mut buf_reader),
-            color_format: read_u32(&mut buf_reader),
-            z_axis_orientation: z_axis_orientation_from_data(read_u32(&mut buf_reader)),
-            compressed: read_u32(&mut buf_reader) != 0,
-            visibility_mask_encoded: read_u32(&mut buf_reader) != 0,
-            num_matrices: read_u32(&mut buf_reader),
-        },
-        matrices: vec![],
-    };
+        let mut matrix = Matrix::new(size_x, size_y, size_z);
 
-    for _ in 0..qb.header.num_matrices {
-        let name_len = read_byte(&mut buf_reader);
+        for z in 0..size_z {
+            for y in 0..size_y {
+                for x in 0..size_x {
+                    let position = math::Vec3::new(x as f32, y as f32, z as f32);
 
-        let mut m = Matrix {
-            name: String::from_utf8(read(&mut buf_reader, name_len as usize)).unwrap(),
-            size: Size {
-                x: read_u32(&mut buf_reader) as usize,
-                y: read_u32(&mut buf_reader) as usize,
-                z: read_u32(&mut buf_reader) as usize,
-            },
-            position: math::Vec3::new(
-                read_u32(&mut buf_reader) as f32,
-                read_u32(&mut buf_reader) as f32,
-                read_u32(&mut buf_reader) as f32,
-            ),
-            voxels: vec![],
-        };
+                    let color = color::Color::rgb_u8(
+                        read_byte(&mut bytes),
+                        read_byte(&mut bytes),
+                        read_byte(&mut bytes),
+                    );
 
-        if !qb.header.compressed {
-            for z in 0..m.size.z {
-                for y in 0..m.size.y {
-                    for x in 0..m.size.x {
-                        let c1 = read_byte(&mut buf_reader);
-                        let c2 = read_byte(&mut buf_reader);
-                        let c3 = read_byte(&mut buf_reader);
-                        let a = read_byte(&mut buf_reader);
+                    // Read the alpha from color. If it is 0 then this voxel is empty.
+                    let visible = read_byte(&mut bytes) > 0;
 
-                        m.voxels.push(VoxelData {
-                            position: math::Vec3::new(x as f32, y as f32, z as f32),
-                            color: color::Color::rgb_u8(c1, c2, c3),
-                            visible: a > 0,
-                        })
-                    }
+                    matrix.set(
+                        position,
+                        if visible {
+                            Voxel::Solid(color)
+                        } else {
+                            Voxel::Empty
+                        },
+                    );
                 }
             }
         }
 
-        qb.matrices.push(m);
+        Ok(matrix)
     }
 
-    qb
+    fn extensions(&self) -> &[&str] {
+        static EXTENSIONS: &[&str] = &["qb"];
+        EXTENSIONS
+    }
+}
+
+fn read_byte<T: io::Read>(reader: &mut T) -> u8 {
+    read(reader, mem::size_of::<u8>())[0]
+}
+
+fn read_u32<T: io::Read>(reader: &mut T) -> u32 {
+    LittleEndian::read_u32(&read(reader, mem::size_of::<u32>()))
 }
 
 fn read<T: io::Read>(reader: &mut T, size: usize) -> Vec<u8> {
@@ -123,13 +99,3 @@ fn read<T: io::Read>(reader: &mut T, size: usize) -> Vec<u8> {
 
     buf
 }
-
-fn read_u32<T: io::Read>(reader: &mut T) -> u32 {
-    LittleEndian::read_u32(&read(reader, mem::size_of::<u32>()))
-}
-
-fn read_byte<T: io::Read>(reader: &mut T) -> u8 {
-    read(reader, mem::size_of::<u8>())[0]
-}
-
-impl 
