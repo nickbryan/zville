@@ -2,8 +2,10 @@ use bevy::prelude::*;
 
 mod matrix;
 mod qb;
+mod vox;
 
 pub use matrix::*;
+pub use vox::*;
 
 #[derive(Default)]
 pub struct VoxelPlugin;

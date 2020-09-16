@@ -1,4 +1,4 @@
-use crate::voxel::matrix::{Matrix, Voxel};
+use crate::voxel::{Matrix, Voxel};
 use bevy::{asset, math, render::color};
 use byteorder::{ByteOrder, LittleEndian};
 use std::io::{self, Read};
@@ -9,7 +9,7 @@ use std::path::Path;
 pub struct QubicleBinaryLoader;
 
 impl asset::AssetLoader<Matrix> for QubicleBinaryLoader {
-    fn from_bytes(&self, _: &Path, bytes: Vec<u8>) -> anyhow::Result<Matrix> {
+    fn from_bytes(&self, _: &Path, bytes: Vec<u8>) -> anyhow::Result<Matrix, anyhow::Error> {
         // Due to the way the .qb files are encoded we have to read the data even if we don't use it.
         // Where data is read and not used the variable is prefixed with an _.
         let mut bytes = bytes.as_slice();
@@ -20,16 +20,18 @@ impl asset::AssetLoader<Matrix> for QubicleBinaryLoader {
 
         let compressed = read_u32(&mut bytes) != 0;
         if compressed {
-            // TODO: get rid of panic
-            panic!("we do not support compressed files");
+            return Err(anyhow::anyhow!(
+                "compressed Qubicle Binary files are not supported"
+            ));
         }
 
         let _visibility_mask_encoded = read_u32(&mut bytes) != 0;
 
         let num_matrices = read_u32(&mut bytes);
         if num_matrices != 1 {
-            // TODO: get rid of panic
-            panic!("expected only 1 matrix in file");
+            return Err(anyhow::anyhow!(
+                "only one matrix expected in Qubicle Binary file"
+            ));
         }
 
         let name_len = read_byte(&mut bytes);

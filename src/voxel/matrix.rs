@@ -1,76 +1,65 @@
+use crate::voxel::Voxel;
 use bevy::{
     math,
     render::{color, mesh},
 };
 
 #[derive(Debug)]
-struct BlockCount {
+struct Size {
     x: usize,
     y: usize,
     z: usize,
 }
 
-impl BlockCount {
+impl Size {
     fn new(x: usize, y: usize, z: usize) -> Self {
         Self { x, y, z }
     }
 
-    fn total(&self) -> usize {
+    fn volume(&self) -> usize {
         self.x * self.y * self.z
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Voxel {
-    Empty,
-    Solid(color::Color),
-}
-
-impl PartialEq for Voxel {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (&Voxel::Empty, &Voxel::Empty) => true,
-            (&Voxel::Solid(a), &Voxel::Solid(b)) => a == b,
-            _ => false,
-        }
     }
 }
 
 #[derive(Debug)]
 pub struct Matrix {
-    block_count: BlockCount,
+    size: Size,
     voxels: Vec<Voxel>,
 }
 
 impl Matrix {
     pub fn new(size_x: usize, size_y: usize, size_z: usize) -> Self {
-        let block_count = BlockCount::new(size_x, size_y, size_z);
-        let capacity = block_count.total();
+        let size = Size::new(size_x, size_y, size_z);
+        let capacity = size.volume();
 
         Self {
-            block_count,
+            size,
             voxels: vec![Voxel::Empty; capacity],
         }
     }
 
     pub fn set(&mut self, pos: math::Vec3, v: Voxel) {
-        self.voxels[(pos.x()
-            + pos.y() * self.block_count.x as f32
-            + pos.z() * self.block_count.x as f32 * self.block_count.y as f32)
-            as usize] = v;
+        let index = self.index(pos);
+        self.voxels[index] = v;
     }
 
-    fn lookup(&self, pos: math::Vec3) -> &Voxel {
-        &self.voxels[(pos.x()
-            + pos.y() * self.block_count.x as f32
-            + pos.z() * self.block_count.x as f32 * self.block_count.y as f32)
-            as usize]
+    pub fn lookup(&self, pos: math::Vec3) -> &Voxel {
+        let index = self.index(pos);
+        &self.voxels[index]
+    }
+
+    fn index(&self, pos: math::Vec3) -> usize {
+        let size_x = self.size.x as f32;
+        let size_y = self.size.y as f32;
+        let index = pos.x() + pos.y() * size_x + pos.z() * size_x * size_y;
+
+        index as usize
     }
 
     pub fn mesh_parts(&self) -> Vec<(mesh::Mesh, color::Color)> {
         let mut parts: Vec<(mesh::Mesh, color::Color)> = Vec::new();
 
-        let dimensions = [self.block_count.x, self.block_count.y, self.block_count.z];
+        let dimensions = [self.size.x, self.size.y, self.size.z];
 
         // Iterate over each face of the Matrix.
         for face in 0..6 {
@@ -146,12 +135,10 @@ impl Matrix {
                             && voxel_a.unwrap() == voxel_b.unwrap()
                         {
                             None
+                        } else if is_back_face {
+                            voxel_b
                         } else {
-                            if is_back_face {
-                                voxel_b
-                            } else {
-                                voxel_a
-                            }
+                            voxel_a
                         };
 
                         n += 1;
