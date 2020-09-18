@@ -9,7 +9,9 @@ impl Plugin for CameraPlugin {
             .init_resource::<MoveSystemState>()
             .add_system(move_system.system())
             .init_resource::<ZoomSystemState>()
-            .add_system(zoom_system.system());
+            .add_system(zoom_system.system())
+            .init_resource::<RotateSystemState>()
+            .add_system(rotate_system.system());
     }
 }
 
@@ -107,6 +109,7 @@ fn zoom_system(
                 let movement = (event.y * ZOOM_SPEED) * time.delta_seconds;
                 let new_value = current + movement;
 
+                // TODO: bevy::math::clamp ??
                 if new_value < MIN_ZOOM {
                     translation.set_y(MIN_ZOOM);
                     return;
@@ -121,6 +124,38 @@ fn zoom_system(
             }
         } else {
             panic!("we currently only deal with pixel units on mouse scroll");
+        }
+    }
+}
+
+#[derive(Default)]
+struct RotateSystemState {
+    mouse_motion_event_reader: EventReader<mouse::MouseMotion>,
+}
+
+fn rotate_system(
+    mut state: ResMut<RotateSystemState>,
+    keyboard_input: Res<Input<KeyCode>>,
+    mouse_button_input: Res<Input<MouseButton>>,
+    events: Res<Events<mouse::MouseMotion>>,
+    time: Res<Time>,
+    mut camera_query: Query<(&CameraComponent, &mut Rotation)>,
+) {
+    if keyboard_input.pressed(KeyCode::LShift) && mouse_button_input.pressed(MouseButton::Left) {
+        let mut rotation_move = Vec2::default();
+
+        for event in state.mouse_motion_event_reader.iter(&events) {
+            rotation_move += event.delta;
+        }
+        for (_, mut rotation) in &mut camera_query.iter() {
+            rotation.0 = rotation
+                .0
+                .mul_quat(Quat::from_rotation_y(
+                    (rotation_move.x() * time.delta_seconds).to_radians(),
+                ))
+                .mul_quat(Quat::from_rotation_x(
+                    (rotation_move.y() * time.delta_seconds).to_radians(),
+                ));
         }
     }
 }
