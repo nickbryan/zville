@@ -1,11 +1,15 @@
 use bevy::input::mouse;
 use bevy::prelude::*;
+use bevy_mod_picking::{PickingGroup, PickingMethod, PickingSource};
+
+pub const STARTUP_STAGE: &str = "camera_startup_stage";
 
 pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut AppBuilder) {
-        app.add_startup_system(setup.system())
+        app.add_startup_stage(STARTUP_STAGE)
+            .add_startup_system_to_stage(STARTUP_STAGE, setup.system())
             .init_resource::<MoveSystemState>()
             .add_system(move_system.system())
             .init_resource::<ZoomSystemState>()
@@ -15,12 +19,16 @@ impl Plugin for CameraPlugin {
     }
 }
 
+pub struct CameraPickingGroup(pub PickingGroup);
+
 struct CameraComponent;
 
 const STARTING_YAW: f32 = 45.0;
 const STARTING_PITCH: f32 = -15.0;
 
 fn setup(mut commands: Commands) {
+    let picking_group = PickingGroup::Group(0);
+
     commands
         .spawn(Camera3dComponents {
             transform: Transform::from_translation_rotation(
@@ -33,10 +41,13 @@ fn setup(mut commands: Commands) {
             ),
             ..Default::default()
         })
-        .with(CameraComponent);
+        .with(CameraComponent)
+        .with(PickingSource::new(picking_group, PickingMethod::Center));
+
+    commands.insert_resource(CameraPickingGroup(picking_group));
 }
 
-const SCROLL_SPEED: f32 = 100.0;
+const SCROLL_SPEED: f32 = 125.0;
 const SCROLL_MARGIN: f32 = 0.1;
 
 #[derive(Default)]
@@ -139,33 +150,57 @@ fn zoom_system(
 #[derive(Default)]
 struct RotateSystemState {
     mouse_motion_event_reader: EventReader<mouse::MouseMotion>,
+    focus: Option<Vec3>,
 }
 
 fn rotate_system(
     mut state: ResMut<RotateSystemState>,
     keyboard_input: Res<Input<KeyCode>>,
-    mouse_button_input: Res<Input<MouseButton>>,
-    events: Res<Events<mouse::MouseMotion>>,
-    time: Res<Time>,
+    (mouse_button_input, mouse_events): (Res<Input<MouseButton>>, Res<Events<mouse::MouseMotion>>),
+    (pick_state, pick_group): (Res<bevy_mod_picking::PickState>, Res<CameraPickingGroup>),
+    windows: Res<Windows>,
     mut camera_query: Query<(&CameraComponent, &mut Transform)>,
 ) {
     if keyboard_input.pressed(KeyCode::LShift) && mouse_button_input.pressed(MouseButton::Left) {
-        let mut rotation_move = Vec2::default();
+        let mut rotation_move = Vec2::zero();
 
-        for event in state.mouse_motion_event_reader.iter(&events) {
-            rotation_move += event.delta;
+        for event in state.mouse_motion_event_reader.iter(&mouse_events) {
+            rotation_move -= event.delta;
         }
-        for (_, mut transform) in &mut camera_query.iter() {
-            let new_rotation = transform
-                .rotation()
-                .mul_quat(Quat::from_rotation_y(
-                    (rotation_move.x() * time.delta_seconds).to_radians(),
-                ))
-                .mul_quat(Quat::from_rotation_x(
-                    (rotation_move.y() * time.delta_seconds).to_radians(),
-                ));
 
-            transform.set_rotation(new_rotation);
+        match state.focus {
+            Some(focus) => {
+                let window = windows.get_primary().unwrap();
+                let screen_width = window.width as f32;
+                let screen_height = window.height as f32;
+
+                // Link virtual sphere rotation relative to window to make it feel nicer
+                let delta_x = rotation_move.x() / screen_width * std::f32::consts::PI * 2.0;
+                let delta_y = rotation_move.y() / screen_height * std::f32::consts::PI;
+
+                let delta_yaw = Quat::from_rotation_y(delta_x);
+                let delta_pitch = Quat::from_rotation_x(delta_y);
+
+                for (_, mut transform) in &mut camera_query.iter() {
+                    let translation =
+                        delta_yaw * delta_pitch * (transform.translation() - focus) + focus;
+                    transform.set_translation(translation);
+
+                    let look = Mat4::face_toward(transform.translation(), focus, Vec3::unit_y());
+                    transform.set_rotation(look.to_scale_rotation_translation().1);
+                }
+            }
+            None => {
+                if let Some(pick) = pick_state.top(pick_group.0) {
+                    state.focus = Some(*pick.position());
+                }
+            }
         }
+
+        return;
+    }
+
+    if state.focus.is_some() {
+        state.focus = None;
     }
 }

@@ -388,6 +388,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_mod_picking"
+version = "0.1.2"
+source = "git+https://github.com/aevyrie/bevy_mod_picking#66ad856281f6881dd26044507475347775cede81"
+dependencies = [
+ "bevy",
+]
+
+[[package]]
 name = "bevy_pbr"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3238,5 +3246,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bevy",
+ "bevy_mod_picking",
  "byteorder",
 ]

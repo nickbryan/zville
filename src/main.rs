@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_mod_picking::*;
 
 mod camera;
 mod cursor;
@@ -13,13 +14,16 @@ fn main() {
         .add_plugin(cursor::CursorPlugin)
         .add_plugin(voxel::VoxelPlugin)
         .add_plugin(camera::CameraPlugin)
-        .add_startup_system(setup.system())
+        .add_plugin(PickingPlugin)
+        .add_startup_stage_after(camera::STARTUP_STAGE, "main")
+        .add_startup_system_to_stage("main", setup.system())
         .run();
 }
 
 fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    camera_pick_group: Res<camera::CameraPickingGroup>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut voxel_matrices: ResMut<Assets<voxel::Matrix>>,
@@ -32,14 +36,16 @@ fn setup(
 
     for (mesh, color) in ground.mesh_parts() {
         let handle = meshes.add(mesh);
-        commands.spawn(PbrComponents {
-            mesh: handle,
-            material: materials.add(StandardMaterial {
-                albedo: color,
+        commands
+            .spawn(PbrComponents {
+                mesh: handle,
+                material: materials.add(StandardMaterial {
+                    albedo: color,
+                    ..Default::default()
+                }),
                 ..Default::default()
-            }),
-            ..Default::default()
-        });
+            })
+            .with(PickableMesh::new([camera_pick_group.0].into()));
     }
 
     commands.spawn(LightComponents {
