@@ -23,11 +23,13 @@ const STARTING_PITCH: f32 = -15.0;
 fn setup(mut commands: Commands) {
     commands
         .spawn(Camera3dComponents {
-            translation: Translation::new(25.0, 20.0, 25.0),
-            rotation: Rotation::from_rotation_yxz(
-                STARTING_YAW.to_radians(),
-                STARTING_PITCH.to_radians(),
-                0.0,
+            transform: Transform::from_translation_rotation(
+                Vec3::new(25.0, 20.0, 25.0),
+                Quat::from_rotation_ypr(
+                    STARTING_YAW.to_radians(),
+                    STARTING_PITCH.to_radians(),
+                    0.0,
+                ),
             ),
             ..Default::default()
         })
@@ -48,7 +50,7 @@ fn move_system(
     events: Res<Events<CursorMoved>>,
     windows: Res<Windows>,
     time: Res<Time>,
-    mut camera_query: Query<(&CameraComponent, &mut Translation, &Rotation)>,
+    mut camera_query: Query<(&CameraComponent, &mut Transform)>,
 ) {
     let window = windows.get_primary().unwrap();
     let screen_width = window.width as f32;
@@ -78,12 +80,17 @@ fn move_system(
         *movement.z_mut() -= (position.y() - (1.0 - SCROLL_MARGIN)) * SCROLL_SPEED;
     }
 
-    for (_, mut translation, rotation) in &mut camera_query.iter() {
+    for (_, mut transform) in &mut camera_query.iter() {
         // Account for camera direction.
-        movement = rotation.mul_vec3(movement);
+        movement = transform.rotation().mul_vec3(movement);
 
-        *translation.x_mut() += movement.x() * time.delta_seconds;
-        *translation.z_mut() += movement.z() * time.delta_seconds;
+        let translation = Vec3::new(
+            transform.translation().x() + movement.x() * time.delta_seconds,
+            transform.translation().y(),
+            transform.translation().z() + movement.z() * time.delta_seconds,
+        );
+
+        transform.set_translation(translation);
     }
 }
 
@@ -100,27 +107,28 @@ fn zoom_system(
     mut state: ResMut<ZoomSystemState>,
     events: Res<Events<mouse::MouseWheel>>,
     time: Res<Time>,
-    mut camera_query: Query<(&CameraComponent, &mut Translation)>,
+    mut camera_query: Query<(&CameraComponent, &mut Transform)>,
 ) {
     for event in state.mouse_wheel_event_reader.iter(&events) {
         if let mouse::MouseScrollUnit::Pixel = event.unit {
-            for (_, mut translation) in &mut camera_query.iter() {
-                let current = translation.y();
+            for (_, mut transform) in &mut camera_query.iter() {
+                let current = transform.translation().y();
                 let movement = (event.y * ZOOM_SPEED) * time.delta_seconds;
                 let new_value = current + movement;
+
+                let mut translation = transform.translation();
+                translation.set_y(new_value);
 
                 // TODO: bevy::math::clamp ??
                 if new_value < MIN_ZOOM {
                     translation.set_y(MIN_ZOOM);
-                    return;
                 }
 
                 if new_value > MAX_ZOOM {
                     translation.set_y(MAX_ZOOM);
-                    return;
                 }
 
-                translation.set_y(new_value);
+                transform.set_translation(translation);
             }
         } else {
             panic!("we currently only deal with pixel units on mouse scroll");
@@ -139,7 +147,7 @@ fn rotate_system(
     mouse_button_input: Res<Input<MouseButton>>,
     events: Res<Events<mouse::MouseMotion>>,
     time: Res<Time>,
-    mut camera_query: Query<(&CameraComponent, &mut Rotation)>,
+    mut camera_query: Query<(&CameraComponent, &mut Transform)>,
 ) {
     if keyboard_input.pressed(KeyCode::LShift) && mouse_button_input.pressed(MouseButton::Left) {
         let mut rotation_move = Vec2::default();
@@ -147,15 +155,17 @@ fn rotate_system(
         for event in state.mouse_motion_event_reader.iter(&events) {
             rotation_move += event.delta;
         }
-        for (_, mut rotation) in &mut camera_query.iter() {
-            rotation.0 = rotation
-                .0
+        for (_, mut transform) in &mut camera_query.iter() {
+            let new_rotation = transform
+                .rotation()
                 .mul_quat(Quat::from_rotation_y(
                     (rotation_move.x() * time.delta_seconds).to_radians(),
                 ))
                 .mul_quat(Quat::from_rotation_x(
                     (rotation_move.y() * time.delta_seconds).to_radians(),
                 ));
+
+            transform.set_rotation(new_rotation);
         }
     }
 }

@@ -43,16 +43,7 @@ fn setup(
     }
 
     commands.spawn(LightComponents {
-        translation: Translation::new(0.0, 250.0, 0.0),
+        transform: Transform::from_translation(Vec3::new(0.0, 250.0, 0.0)),
         ..Default::default()
     });
-
-    // commands.spawn(Camera3dComponents {
-    //     transform: Transform::new_sync_disabled(Mat4::face_toward(
-    //         Vec3::new(75.0, 50.0, 75.0),
-    //         Vec3::new(25.0, 5.0, 25.0),
-    //         Vec3::new(0.0, 1.0, 0.0),
-    //     )),
-    //     ..Default::default()
-    // });
 }
