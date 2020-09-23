@@ -1,14 +1,16 @@
 use crate::voxel::{Matrix, Voxel};
-use bevy::{asset, math, render::color};
+use bevy::asset::AssetLoader;
+use bevy::prelude::*;
 use byteorder::{ByteOrder, LittleEndian};
-use std::io::{self, Read};
+use std::convert::TryFrom;
+use std::io::prelude::*;
 use std::mem;
 use std::path::Path;
 
 #[derive(Default)]
 pub struct QubicleBinaryLoader;
 
-impl asset::AssetLoader<Matrix> for QubicleBinaryLoader {
+impl AssetLoader<Matrix> for QubicleBinaryLoader {
     fn from_bytes(&self, _: &Path, bytes: Vec<u8>) -> anyhow::Result<Matrix, anyhow::Error> {
         // Due to the way the .qb files are encoded we have to read the data even if we don't use it.
         // Where data is read and not used the variable is prefixed with an _.
@@ -35,13 +37,13 @@ impl asset::AssetLoader<Matrix> for QubicleBinaryLoader {
         }
 
         let name_len = read_byte(&mut bytes);
-        let _name = String::from_utf8(read(&mut bytes, name_len as usize)).unwrap();
+        let _name = String::from_utf8(read(&mut bytes, usize::from(name_len))).unwrap();
 
-        let size_x = read_u32(&mut bytes) as usize;
-        let size_y = read_u32(&mut bytes) as usize;
-        let size_z = read_u32(&mut bytes) as usize;
+        let size_x = usize::try_from(read_u32(&mut bytes))?;
+        let size_y = usize::try_from(read_u32(&mut bytes))?;
+        let size_z = usize::try_from(read_u32(&mut bytes))?;
 
-        let _matrix_position = math::Vec3::new(
+        let _matrix_position = Vec3::new(
             read_u32(&mut bytes) as f32,
             read_u32(&mut bytes) as f32,
             read_u32(&mut bytes) as f32,
@@ -52,9 +54,9 @@ impl asset::AssetLoader<Matrix> for QubicleBinaryLoader {
         for z in 0..size_z {
             for y in 0..size_y {
                 for x in 0..size_x {
-                    let position = math::Vec3::new(x as f32, y as f32, z as f32);
+                    let position = Vec3::new(x as f32, y as f32, z as f32);
 
-                    let color = color::Color::rgb_u8(
+                    let color = Color::rgb_u8(
                         read_byte(&mut bytes),
                         read_byte(&mut bytes),
                         read_byte(&mut bytes),
@@ -84,18 +86,18 @@ impl asset::AssetLoader<Matrix> for QubicleBinaryLoader {
     }
 }
 
-fn read_byte<T: io::Read>(reader: &mut T) -> u8 {
+fn read_byte<T: Read>(reader: &mut T) -> u8 {
     read(reader, mem::size_of::<u8>())[0]
 }
 
-fn read_u32<T: io::Read>(reader: &mut T) -> u32 {
+fn read_u32<T: Read>(reader: &mut T) -> u32 {
     LittleEndian::read_u32(&read(reader, mem::size_of::<u32>()))
 }
 
-fn read<T: io::Read>(reader: &mut T, size: usize) -> Vec<u8> {
+fn read<T: Read>(reader: &mut T, size: usize) -> Vec<u8> {
     let mut buf = Vec::with_capacity(size);
 
-    let mut part_reader = reader.take(size as u64);
+    let mut part_reader = reader.take(u64::try_from(size).unwrap());
 
     part_reader.read_to_end(&mut buf).unwrap();
 

@@ -1,11 +1,13 @@
 use crate::window::LockCursor;
 use bevy::input::mouse::MouseMotion;
-use bevy::prelude::*;
+use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy::window::WindowCreated;
 
-pub struct CursorPlugin;
+const STAGE: &str = "cursor_stage";
 
-impl Plugin for CursorPlugin {
+pub struct Plugin;
+
+impl BevyPlugin for Plugin {
     fn build(&self, app: &mut AppBuilder) {
         app.init_resource::<LockCursorSystemState>()
             .add_startup_system(setup.system())
@@ -80,8 +82,6 @@ fn lock_cursor_system(
         lock_commands.send(LockCursor(event.id));
     }
 }
-
-const STAGE: &str = "cursor_stage";
 
 fn clear_cursor_moved_events_system(mut events: ResMut<Events<CursorMoved>>) {
     events.clear();

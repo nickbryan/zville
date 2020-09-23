@@ -8,12 +8,12 @@ mod window;
 
 fn main() {
     App::build()
-        .add_plugin(window::WindowPlugin)
+        .add_plugin(window::Plugin)
         .add_default_plugins()
         .add_system(bevy::input::system::exit_on_esc_system.system())
-        .add_plugin(cursor::CursorPlugin)
-        .add_plugin(voxel::VoxelPlugin)
-        .add_plugin(camera::CameraPlugin)
+        .add_plugin(cursor::Plugin)
+        .add_plugin(voxel::Plugin)
+        .add_plugin(camera::Plugin)
         .add_plugin(PickingPlugin)
         .add_startup_stage_after(camera::STARTUP_STAGE, "main")
         .add_startup_system_to_stage("main", setup.system())

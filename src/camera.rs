@@ -1,12 +1,14 @@
 use bevy::input::mouse;
-use bevy::prelude::*;
+use bevy::math;
+use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy_mod_picking::{PickingGroup, PickingMethod, PickingSource};
+use std::f32::consts::PI;
 
 pub const STARTUP_STAGE: &str = "camera_startup_stage";
 
-pub struct CameraPlugin;
+pub struct Plugin;
 
-impl Plugin for CameraPlugin {
+impl BevyPlugin for Plugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_startup_stage(STARTUP_STAGE)
             .add_startup_system_to_stage(STARTUP_STAGE, setup.system())
@@ -128,17 +130,7 @@ fn zoom_system(
                 let new_value = current + movement;
 
                 let mut translation = transform.translation();
-                translation.set_y(new_value);
-
-                // TODO: bevy::math::clamp ??
-                if new_value < MIN_ZOOM {
-                    translation.set_y(MIN_ZOOM);
-                }
-
-                if new_value > MAX_ZOOM {
-                    translation.set_y(MAX_ZOOM);
-                }
-
+                translation.set_y(math::clamp(new_value, MIN_ZOOM, MAX_ZOOM));
                 transform.set_translation(translation);
             }
         } else {
@@ -175,8 +167,8 @@ fn rotate_system(
                 let screen_height = window.height as f32;
 
                 // Link virtual sphere rotation relative to window to make it feel nicer
-                let delta_x = rotation_move.x() / screen_width * std::f32::consts::PI * 2.0;
-                let delta_y = rotation_move.y() / screen_height * std::f32::consts::PI;
+                let delta_x = rotation_move.x() / screen_width * PI * 2.0;
+                let delta_y = rotation_move.y() / screen_height * PI;
 
                 let delta_yaw = Quat::from_rotation_y(delta_x);
                 let delta_pitch = Quat::from_rotation_x(delta_y);

@@ -1,5 +1,3 @@
-use bevy::prelude::*;
-
 mod matrix;
 mod qb;
 mod vox;
@@ -7,12 +5,15 @@ mod vox;
 pub use matrix::*;
 pub use vox::*;
 
-#[derive(Default)]
-pub struct VoxelPlugin;
+use bevy::prelude::{Plugin as BevyPlugin, *};
+use qb::QubicleBinaryLoader;
 
-impl Plugin for VoxelPlugin {
+#[derive(Default)]
+pub struct Plugin;
+
+impl BevyPlugin for Plugin {
     fn build(&self, app: &mut AppBuilder) {
-        app.add_asset::<matrix::Matrix>()
-            .add_asset_loader::<matrix::Matrix, qb::QubicleBinaryLoader>();
+        app.add_asset::<Matrix>()
+            .add_asset_loader::<Matrix, QubicleBinaryLoader>();
     }
 }

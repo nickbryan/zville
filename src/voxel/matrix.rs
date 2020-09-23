@@ -1,8 +1,6 @@
 use crate::voxel::Voxel;
-use bevy::{
-    math,
-    render::{color, mesh},
-};
+use bevy::prelude::*;
+use bevy::render::{mesh::VertexAttribute, pipeline::PrimitiveTopology};
 
 #[derive(Debug)]
 struct Size {
@@ -38,17 +36,17 @@ impl Matrix {
         }
     }
 
-    pub fn set(&mut self, pos: math::Vec3, v: Voxel) {
+    pub fn set(&mut self, pos: Vec3, v: Voxel) {
         let index = self.index(pos);
         self.voxels[index] = v;
     }
 
-    pub fn lookup(&self, pos: math::Vec3) -> &Voxel {
+    pub fn lookup(&self, pos: Vec3) -> &Voxel {
         let index = self.index(pos);
         &self.voxels[index]
     }
 
-    fn index(&self, pos: math::Vec3) -> usize {
+    fn index(&self, pos: Vec3) -> usize {
         let size_x = self.size.x as f32;
         let size_y = self.size.y as f32;
         let index = pos.x() + pos.y() * size_x + pos.z() * size_x * size_y;
@@ -56,8 +54,8 @@ impl Matrix {
         index as usize
     }
 
-    pub fn mesh_parts(&self) -> Vec<(mesh::Mesh, color::Color)> {
-        let mut parts: Vec<(mesh::Mesh, color::Color)> = Vec::new();
+    pub fn mesh_parts(&self) -> Vec<(Mesh, Color)> {
+        let mut parts: Vec<(Mesh, Color)> = Vec::new();
 
         let dimensions = [self.size.x, self.size.y, self.size.z];
 
@@ -68,8 +66,8 @@ impl Matrix {
             let axis_a = (direction + 1) % 3;
             let axis_b = (direction + 2) % 3;
 
-            let mut start_pos = math::Vec3::zero();
-            let mut axis_offset = math::Vec3::zero();
+            let mut start_pos = Vec3::zero();
+            let mut axis_offset = Vec3::zero();
             axis_offset[direction] = 1.0;
 
             let mut mask: Vec<Option<&Voxel>> = vec![None; dimensions[axis_a] * dimensions[axis_b]];
@@ -185,10 +183,10 @@ impl Matrix {
                                 start_pos[axis_a] = i as f32;
                                 start_pos[axis_b] = j as f32;
 
-                                let mut du = math::Vec3::zero();
+                                let mut du = Vec3::zero();
                                 du[axis_a] = w as f32;
 
-                                let mut dv = math::Vec3::zero();
+                                let mut dv = Vec3::zero();
                                 dv[axis_b] = h as f32;
 
                                 let normal = match side {
@@ -226,13 +224,12 @@ impl Matrix {
                                     uvs.push(*uv);
                                 }
 
-                                let m = mesh::Mesh {
-                                    primitive_topology:
-                                        bevy::render::pipeline::PrimitiveTopology::TriangleList,
+                                let m = Mesh {
+                                    primitive_topology: PrimitiveTopology::TriangleList,
                                     attributes: vec![
-                                        mesh::VertexAttribute::position(positions),
-                                        mesh::VertexAttribute::normal(normals),
-                                        mesh::VertexAttribute::uv(uvs),
+                                        VertexAttribute::position(positions),
+                                        VertexAttribute::normal(normals),
+                                        VertexAttribute::uv(uvs),
                                     ],
                                     indices: Some(indices),
                                 };

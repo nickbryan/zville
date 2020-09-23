@@ -1,8 +1,8 @@
-use bevy::prelude::*;
+use bevy::prelude::{Plugin as BevyPlugin, *};
 
-pub struct WindowPlugin;
+pub struct Plugin;
 
-impl Plugin for WindowPlugin {
+impl BevyPlugin for Plugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_resource(WindowDescriptor {
             title: "zVille".to_string(),

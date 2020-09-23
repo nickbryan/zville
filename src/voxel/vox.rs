@@ -1,9 +1,9 @@
-use bevy::render::color;
+use bevy::render::color::Color;
 
 #[derive(Debug, Copy, Clone)]
 pub enum Voxel {
     Empty,
-    Solid(color::Color),
+    Solid(Color),
 }
 
 impl PartialEq for Voxel {
