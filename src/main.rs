@@ -32,12 +32,36 @@ fn setup(
         .load_sync(&mut voxel_matrices, "assets/ground.qb")
         .unwrap();
 
+    let small_model_handle = asset_server
+        .load_sync(&mut voxel_matrices, "assets/16x16x16.qb")
+        .unwrap();
+
     let ground = voxel_matrices.get(&ground_handle).unwrap();
+    let small_model = voxel_matrices.get(&small_model_handle).unwrap();
 
     for (mesh, color) in ground.mesh_parts() {
         let handle = meshes.add(mesh);
         commands
             .spawn(PbrComponents {
+                mesh: handle,
+                material: materials.add(StandardMaterial {
+                    albedo: color,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            })
+            .with(PickableMesh::new([camera_pick_group.0].into()));
+    }
+
+    for (mesh, color) in small_model.mesh_parts() {
+        let handle = meshes.add(mesh);
+        commands
+            .spawn(PbrComponents {
+                transform: Transform::from_translation_rotation_scale(
+                    Vec3::new(10.0, 5.0, 10.0),
+                    Quat::identity(),
+                    1.0 / 16.0,
+                ),
                 mesh: handle,
                 material: materials.add(StandardMaterial {
                     albedo: color,
